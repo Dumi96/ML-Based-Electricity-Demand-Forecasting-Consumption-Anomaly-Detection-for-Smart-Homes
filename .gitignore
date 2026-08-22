@@ -1,19 +1,28 @@
-# Python
+# ================================
+# Smart Energy AI - Git Ignore
+# ================================
+
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Data
+# Raw and processed datasets
 data/raw/*
 data/processed/*
+
+# Keep the folders in Git
+!data/raw/.gitkeep
+!data/processed/.gitkeep
 
 # Trained models
 models/*.pkl
@@ -21,14 +30,15 @@ models/*.joblib
 models/*.h5
 models/*.keras
 
-# Environment variables
+# Environment variables / secrets
 .env
+.env.*
 
 # IDE
 .vscode/
 .idea/
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
@@ -37,3 +47,12 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+tempCodeRunnerFile.py
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
