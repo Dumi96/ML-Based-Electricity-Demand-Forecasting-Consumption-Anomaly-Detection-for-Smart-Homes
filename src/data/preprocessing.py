@@ -20,11 +20,12 @@ def create_timestamp(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     df["timestamp"] = pd.to_datetime(
-        df["Date"].astype(str)
-        + " "
-        + df["Time"].astype(str),
-        errors="coerce"
-    )
+    df["Date"].astype(str)
+    + " "
+    + df["Time"].astype(str),
+    format="%d/%m/%Y %H:%M:%S",
+    errors="coerce"
+)
 
     return df
 
