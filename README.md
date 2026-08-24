@@ -50,4 +50,3 @@ Demand Forecasting    Anomaly Detection
                  |
                  v
      Energy Insights & Recommendations
-```
