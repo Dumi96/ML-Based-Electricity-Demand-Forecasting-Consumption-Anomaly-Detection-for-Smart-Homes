@@ -50,3 +50,24 @@ Demand Forecasting    Anomaly Detection
                  |
                  v
      Energy Insights & Recommendations
+
+     # SmartEnergy AI
+
+ML-Based Electricity Demand Forecasting,
+Consumption Anomaly Detection and Energy
+Optimization for Smart Homes
+
+## Features
+
+- Electricity consumption forecasting
+- Peak demand prediction
+- Consumption anomaly detection
+- Electricity cost estimation
+- Energy-saving recommendations
+- Interactive analytics dashboard
+- Explainable ML
+- Automated ML pipelines
+- REST API
+- Model monitoring
+- Data quality monitoring
+```

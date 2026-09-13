@@ -1,0 +1,25 @@
+{
+    "model_name": "Tuned XGBoost",
+    "task": "Hourly electricity demand forecasting",
+    "n_estimators": 700,
+    "max_depth": 8,
+    "learning_rate": 0.02,
+    "min_child_weight": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42,
+    "validation_metrics": {
+        "MAE": 0.367316,
+        "RMSE": 0.530035,
+        "MAPE": 40.182214,
+        "sMAPE": 31.704615,
+        "R2": 0.646919
+    },
+    "peak_validation_metrics": {
+        "MAE": 1.099907,
+        "RMSE": 1.302195,
+        "MAPE": 30.444417,
+        "sMAPE": 38.433051,
+        "R2": -5.137001
+    }
+}
