@@ -23,6 +23,11 @@ import streamlit as st
 from src.assistant.assistant import SmartEnergyAssistant
 from src.assistant.voice import VoiceAssistant
 
+API_URL = os.getenv(
+    "SMARTENERGY_API_URL",
+    "http://127.0.0.1:8000"
+).rstrip("/")
+
 try:  # optional: PDF export (pip install fpdf2)
     from fpdf import FPDF
     PDF_OK = True
@@ -35,7 +40,7 @@ except Exception:
 
 if "smart_energy_assistant" not in st.session_state:
     st.session_state.smart_energy_assistant = SmartEnergyAssistant(
-        api_url="http://127.0.0.1:8000"
+        api_url=API_URL
     )
 
 if "voice_assistant" not in st.session_state:
@@ -62,7 +67,6 @@ st.set_page_config(
 ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT.parent if ROOT.name.lower() == "app" else ROOT
 DATA_FILE = PROJECT_ROOT / "results" / "anomaly_detection_results.csv"
-API_URL = os.getenv("SMARTENERGY_API_URL", "http://127.0.0.1:8000").rstrip("/")
 MODEL_NAME = "Tuned XGBoost"
 
 # ---- user settings (read from the previous run so they apply before the sidebar is drawn) ----

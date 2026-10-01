@@ -26,8 +26,8 @@ data/interim/*
 !data/processed/.gitkeep
 
 # Trained model binaries
+# Production models are intentionally committed for cloud deployment
 models/*.pkl
-models/*.joblib
 models/*.h5
 models/*.keras
 
@@ -61,6 +61,9 @@ htmlcov/
 # Generated outputs
 results/*
 !results/.gitkeep
+
+# Required production/demo dataset
+!results/anomaly_detection_results.csv
 
 # ============================================================
 # Python
