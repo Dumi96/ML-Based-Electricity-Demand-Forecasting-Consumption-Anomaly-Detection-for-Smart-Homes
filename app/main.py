@@ -21,7 +21,13 @@ import requests
 import streamlit as st
 
 from src.assistant.assistant import SmartEnergyAssistant
-from src.assistant.voice import VoiceAssistant
+
+try:
+    from src.assistant.voice import VoiceAssistant
+    VOICE_AVAILABLE = True
+except Exception:
+    VoiceAssistant = None
+    VOICE_AVAILABLE = False
 
 API_URL = os.getenv(
     "SMARTENERGY_API_URL",
@@ -44,9 +50,15 @@ if "smart_energy_assistant" not in st.session_state:
     )
 
 if "voice_assistant" not in st.session_state:
-    st.session_state.voice_assistant = VoiceAssistant(
-        language="en-US"
-    )
+    if VOICE_AVAILABLE:
+        try:
+            st.session_state.voice_assistant = VoiceAssistant(
+                language="en-US"
+            )
+        except Exception:
+            st.session_state.voice_assistant = None
+    else:
+        st.session_state.voice_assistant = None
 
 # ============================================================
 # Electricity Demand Forecasting and Anomaly Detection for Smart Homes
@@ -1452,6 +1464,13 @@ def process_voice_question():
     voice = st.session_state.voice_assistant
     ai = st.session_state.smart_energy_assistant
 
+    if voice is None:
+        st.warning(
+            "Voice features are unavailable in this deployment. "
+            "Please use the text chat instead."
+        )
+        return
+
     with st.spinner("🎙️ Listening..."):
         question = voice.listen(
             timeout=5,
@@ -1550,36 +1569,28 @@ with tab_ai:
     )
 
     with voice_col1:
-
-        if st.button(
+        if not VOICE_AVAILABLE or st.session_state.voice_assistant is None:
+            st.button(
+                "🎙️ Ask by Voice",
+                use_container_width=True,
+                key="voice_ask_button",
+                disabled=True,
+            )
+        elif st.button(
             "🎙️ Ask by Voice",
             use_container_width=True,
             key="voice_ask_button",
         ):
-
             try:
                 process_voice_question()
-
             except Exception as voice_error:
-
-                error_message = (
-                    "Voice input could not be started. "
-                    "Please check that your microphone is connected "
-                    "and that PyAudio is installed."
+                st.warning(
+                    "Voice input is unavailable in this environment. "
+                    "Please use the text chat instead."
                 )
-
-                st.session_state.chat.append(
-                    ("assistant", error_message)
-                )
-
-                st.error(
-                    f"{error_message}\n\n"
-                    f"Technical detail: {voice_error}"
-                )
-
+                st.caption(f"Technical detail: {voice_error}")
 
     with voice_col2:
-
         st.markdown(
             """
             <div style="
@@ -1592,22 +1603,27 @@ with tab_ai:
             ">
                 🎤 <b>Voice Assistant</b><br>
                 <span style="font-size: 0.85rem;">
-                Click the microphone button and ask your question.
+                Voice input depends on microphone and audio support.
+                Use the text chat if voice is unavailable.
                 </span>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-
     with voice_col3:
-
-        if st.button(
+        if not VOICE_AVAILABLE or st.session_state.voice_assistant is None:
+            st.button(
+                "🔊 Test Voice",
+                use_container_width=True,
+                key="test_voice_button",
+                disabled=True,
+            )
+        elif st.button(
             "🔊 Test Voice",
             use_container_width=True,
             key="test_voice_button",
         ):
-
             test_message = (
                 "Hello! I am SmartEnergy AI. "
                 "Your voice assistant is working."
@@ -1617,17 +1633,12 @@ with tab_ai:
                 st.session_state.voice_assistant.speak(
                     test_message
                 )
-
                 st.success("Voice output is working.")
-
             except Exception as voice_error:
-
-                st.error(
-                    f"Voice output failed: {voice_error}"
+                st.warning(
+                    "Voice output is unavailable in this environment."
                 )
-
-
-    st.markdown("")
+                st.caption(f"Technical detail: {voice_error}")
 
 
     # ========================================================
