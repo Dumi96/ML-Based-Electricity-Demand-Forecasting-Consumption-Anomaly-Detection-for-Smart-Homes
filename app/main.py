@@ -21,6 +21,7 @@ import requests
 import streamlit as st
 
 from src.assistant.assistant import SmartEnergyAssistant
+from src.inference import forecast_from_history, detect_anomaly, estimate_cost
 
 try:
     from src.assistant.voice import VoiceAssistant
@@ -374,15 +375,51 @@ def cmp_block(col, title, cur, prev):
 
 @st.cache_data(ttl=30, show_spinner=False)
 def api(method, endpoint, payload_json=None, timeout=10):
+    """Try FastAPI first, then use the bundled models locally."""
+    started = time.perf_counter()
+    payload = json.loads(payload_json) if payload_json else {}
+
     try:
-        t0 = time.perf_counter()
         if method == "GET":
-            r = requests.get(f"{API_URL}{endpoint}", timeout=timeout)
+            response = requests.get(f"{API_URL}{endpoint}", timeout=timeout)
         else:
-            r = requests.post(f"{API_URL}{endpoint}", json=json.loads(payload_json), timeout=timeout)
-        r.raise_for_status()
-        return r.json(), (time.perf_counter() - t0) * 1000
+            response = requests.post(
+                f"{API_URL}{endpoint}", json=payload, timeout=timeout
+            )
+        response.raise_for_status()
+        return response.json(), (time.perf_counter() - started) * 1000
+
     except (requests.RequestException, ValueError):
+        try:
+            if method == "GET" and endpoint == "/health":
+                return {
+                    "status": "healthy",
+                    "service": "SmartEnergy AI local inference",
+                    "model": "tuned_xgboost_forecaster",
+                    "local_fallback": True,
+                }, (time.perf_counter() - started) * 1000
+
+            if method == "POST" and endpoint == "/forecast-from-history":
+                result = forecast_from_history(
+                    payload["history_end_timestamp"],
+                    payload["hourly_consumption_kw"],
+                )
+                return result, (time.perf_counter() - started) * 1000
+
+            if method == "POST" and endpoint == "/anomaly":
+                result = detect_anomaly(
+                    payload["history_end_timestamp"],
+                    payload["hourly_consumption_kw"],
+                )
+                return result, (time.perf_counter() - started) * 1000
+
+            if method == "POST" and endpoint == "/cost-estimate":
+                result = estimate_cost(payload["monthly_energy_kwh"])
+                return result, (time.perf_counter() - started) * 1000
+
+        except (KeyError, TypeError, ValueError, FileNotFoundError, RuntimeError):
+            return None, None
+
         return None, None
 
 
@@ -1503,6 +1540,7 @@ def process_voice_question():
             .astype(float)
             .tolist()
         ),
+        "history_end_timestamp": df["timestamp"].iloc[-1].isoformat(),
         "demand_kw": (
             float(df["demand_kw"].iloc[-1])
             if len(df)

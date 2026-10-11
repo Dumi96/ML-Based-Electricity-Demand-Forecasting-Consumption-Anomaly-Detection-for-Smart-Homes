@@ -15,6 +15,7 @@ later be used by the web dashboard and voice assistant.
 """
 
 from __future__ import annotations
+from src.inference import forecast_from_history, detect_anomaly, estimate_cost
 
 from typing import Any, Dict, Optional
 
@@ -338,364 +339,90 @@ class SmartEnergyAssistant:
     def get_forecast(
         self,
         history: list[float],
+        history_end_timestamp: str | None = None,
     ) -> Dict[str, Any]:
-        """
-        Request a next-hour electricity demand forecast.
-
-        The current FastAPI endpoint requires at least 169 hourly
-        historical observations.
-        """
-
-        if not history:
+        """Forecast the next hour using the API or local model."""
+        if len(history) < 169:
             return {
                 "success": False,
-                "error": "Historical energy data is required.",
+                "error": "At least 169 hourly observations are required.",
             }
 
-        return self._post(
-            "/forecast-from-history",
-            {
-                "history": history,
-            },
-        )
+        from datetime import datetime, timezone
+
+        timestamp = history_end_timestamp or datetime.now(
+            timezone.utc
+        ).replace(tzinfo=None).isoformat()
+
+        payload = {
+            "history_end_timestamp": timestamp,
+            "hourly_consumption_kw": list(history),
+        }
+
+        result = self._post("/forecast-from-history", payload)
+        if result and not result.get("error") and result.get("success") is not False:
+            return result
+
+        try:
+            return forecast_from_history(timestamp, list(history))
+        except (ValueError, RuntimeError, FileNotFoundError) as exc:
+            return {"success": False, "error": str(exc)}
 
     def get_anomaly(
         self,
         history: list[float],
+        history_end_timestamp: str | None = None,
     ) -> Dict[str, Any]:
-        """
-        Request anomaly detection from the FastAPI backend.
-        """
-
-        if not history:
+        """Detect consumption anomalies using the API or local model."""
+        if len(history) < 169:
             return {
                 "success": False,
-                "error": "Historical energy data is required.",
+                "error": "At least 169 hourly observations are required.",
             }
 
-        return self._post(
-            "/anomaly",
-            {
-                "history": history,
-            },
-        )
+        from datetime import datetime, timezone
+
+        timestamp = history_end_timestamp or datetime.now(
+            timezone.utc
+        ).replace(tzinfo=None).isoformat()
+
+        payload = {
+            "history_end_timestamp": timestamp,
+            "hourly_consumption_kw": list(history),
+        }
+
+        result = self._post("/anomaly", payload)
+        if result and not result.get("error") and result.get("success") is not False:
+            return result
+
+        try:
+            return detect_anomaly(timestamp, list(history))
+        except (ValueError, RuntimeError, FileNotFoundError) as exc:
+            return {"success": False, "error": str(exc)}
 
     def get_cost_estimate(
         self,
         monthly_kwh: float,
     ) -> Dict[str, Any]:
-        """
-        Request an estimated monthly electricity cost.
-
-        The current backend uses its configured tariff/cost model.
-        """
-
+        """Estimate monthly electricity cost using API or local reference data."""
         try:
             monthly_kwh = float(monthly_kwh)
         except (TypeError, ValueError):
-            return {
-                "success": False,
-                "error": "Monthly consumption must be a number.",
-            }
+            return {"success": False, "error": "Monthly consumption must be a number."}
 
         if monthly_kwh < 0:
-            return {
-                "success": False,
-                "error": "Monthly consumption cannot be negative.",
-            }
+            return {"success": False, "error": "Monthly consumption cannot be negative."}
 
-        return self._post(
-            "/cost-estimate",
-            {
-                "monthly_kwh": monthly_kwh,
-            },
-        )
+        payload = {"monthly_energy_kwh": monthly_kwh}
+        result = self._post("/cost-estimate", payload)
 
-    # ==================================================================
-    # RESPONSE FORMATTERS
-    # ==================================================================
+        if result and not result.get("error") and result.get("success") is not False:
+            return result
 
-    def _format_error(
-        self,
-        data: Dict[str, Any],
-    ) -> str:
-        """
-        Convert API errors into a user-friendly message.
-        """
-
-        error = data.get(
-            "error",
-            "An unknown SmartEnergy API error occurred.",
-        )
-
-        return (
-            "I couldn't complete that request. "
-            f"{error}"
-        )
-
-    def format_response(
-        self,
-        intent: str,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """
-        Convert backend results into a natural-language response.
-        """
-
-        data = data or {}
-
-        # --------------------------------------------------------------
-        # HELP
-        # --------------------------------------------------------------
-
-        if intent == "help":
-            return (
-                "I can help you with electricity demand forecasts, "
-                "anomaly detection, consumption analysis, electricity "
-                "cost estimates, peak-demand periods, and energy-saving ideas."
-            )
-
-        # --------------------------------------------------------------
-        # SAVING
-        # --------------------------------------------------------------
-
-        if intent == "saving":
-            return (
-                "A useful starting point is to reduce flexible electricity "
-                "usage during high-demand periods, especially during evening "
-                "peak hours. The SmartEnergy dashboard can help identify "
-                "high-demand periods and unusual consumption patterns."
-            )
-
-        # --------------------------------------------------------------
-        # GENERAL
-        # --------------------------------------------------------------
-
-        if intent == "general":
-            return (
-                "I can help you analyze electricity consumption, "
-                "forecast future demand, detect anomalies, estimate "
-                "electricity costs, and understand energy-saving opportunities."
-            )
-
-        # --------------------------------------------------------------
-        # EMPTY RESPONSE
-        # --------------------------------------------------------------
-
-        if not data:
-            return "I couldn't retrieve any SmartEnergy data."
-
-        # --------------------------------------------------------------
-        # API ERROR
-        # --------------------------------------------------------------
-
-        if data.get("success") is False:
-            return self._format_error(data)
-
-        # --------------------------------------------------------------
-        # FORECAST
-        # --------------------------------------------------------------
-
-        if intent == "forecast":
-
-            prediction = None
-
-            possible_keys = [
-                "prediction",
-                "forecast",
-                "predicted_demand",
-                "predicted_demand_kw",
-                "forecast_kw",
-                "next_hour_forecast",
-            ]
-
-            for key in possible_keys:
-                if key in data:
-                    prediction = data[key]
-                    break
-
-            if prediction is None:
-                return (
-                    "The forecast request completed, but the API "
-                    "did not return a prediction value."
-                )
-
-            try:
-                prediction = float(prediction)
-
-                return (
-                    "The predicted electricity demand for the next hour "
-                    f"is approximately {prediction:.2f} kW."
-                )
-
-            except (TypeError, ValueError):
-                return (
-                    "The forecast was generated, but the returned "
-                    f"value was {prediction}."
-                )
-
-        # --------------------------------------------------------------
-        # ANOMALY
-        # --------------------------------------------------------------
-
-        if intent == "anomaly":
-
-            is_anomaly = data.get("is_anomaly")
-
-            category = data.get("category")
-
-            anomaly_score = data.get(
-                "anomaly_score",
-                data.get("decision_score"),
-            )
-
-            # Convert possible string boolean values.
-            if isinstance(is_anomaly, str):
-
-                is_anomaly = is_anomaly.lower() in [
-                    "true",
-                    "1",
-                    "yes",
-                    "anomaly",
-                ]
-
-            if is_anomaly is True:
-
-                response = (
-                    "An unusual electricity consumption pattern "
-                    "was detected."
-                )
-
-                if category:
-                    response += f" Category: {category}."
-
-                if anomaly_score is not None:
-
-                    try:
-                        response += (
-                            f" Anomaly score: "
-                            f"{float(anomaly_score):.3f}."
-                        )
-
-                    except (TypeError, ValueError):
-                        pass
-
-                return response
-
-            if is_anomaly is False:
-                return (
-                    "No significant electricity consumption anomaly "
-                    "was detected."
-                )
-
-            # Some APIs return a prediction value instead.
-            prediction = data.get("prediction")
-
-            if prediction == -1:
-                return (
-                    "An unusual electricity consumption pattern "
-                    "was detected."
-                )
-
-            if prediction == 1:
-                return (
-                    "No significant electricity consumption anomaly "
-                    "was detected."
-                )
-
-            return (
-                "The anomaly detector returned a result, but I "
-                "could not determine the anomaly status."
-            )
-
-        # --------------------------------------------------------------
-        # COST
-        # --------------------------------------------------------------
-
-        if intent == "cost":
-
-            cost = None
-
-            possible_keys = [
-                "estimated_cost",
-                "cost",
-                "monthly_bill",
-                "estimated_bill",
-                "bill",
-                "total_cost",
-            ]
-
-            for key in possible_keys:
-                if key in data:
-                    cost = data[key]
-                    break
-
-            if cost is None:
-                return (
-                    "The electricity cost calculation completed, "
-                    "but no estimated amount was returned."
-                )
-
-            try:
-                return (
-                    "The estimated electricity cost is approximately "
-                    f"LKR {float(cost):,.2f}."
-                )
-
-            except (TypeError, ValueError):
-                return (
-                    "The estimated electricity cost is "
-                    f"{cost}."
-                )
-
-        # --------------------------------------------------------------
-        # CURRENT CONSUMPTION
-        # --------------------------------------------------------------
-
-        if intent == "consumption":
-
-            demand = None
-
-            possible_keys = [
-                "demand_kw",
-                "current_demand",
-                "current_demand_kw",
-                "consumption",
-                "consumption_kw",
-                "power_kw",
-            ]
-
-            for key in possible_keys:
-                if key in data:
-                    demand = data[key]
-                    break
-
-            if demand is None:
-                return (
-                    "I need the current SmartEnergy measurement "
-                    "to report the current electricity demand."
-                )
-
-            try:
-                return (
-                    "The current electricity demand is approximately "
-                    f"{float(demand):.2f} kW."
-                )
-
-            except (TypeError, ValueError):
-                return (
-                    "The current electricity demand is "
-                    f"{demand}."
-                )
-
-        return (
-            "I received the SmartEnergy information, but I couldn't "
-            "determine how to explain the result."
-        )
-
-    # ==================================================================
-    # MAIN ASSISTANT FUNCTION
-    # ==================================================================
+        try:
+            return estimate_cost(monthly_kwh)
+        except (ValueError, RuntimeError) as exc:
+            return {"success": False, "error": str(exc)}
 
     def ask(
         self,
@@ -817,6 +544,7 @@ class SmartEnergyAssistant:
 
             result = self.get_forecast(
                 history=list(history),
+                history_end_timestamp=data.get("history_end_timestamp"),
             )
 
             return self.format_response(
@@ -851,6 +579,7 @@ class SmartEnergyAssistant:
 
             result = self.get_anomaly(
                 history=list(history),
+                history_end_timestamp=data.get("history_end_timestamp"),
             )
 
             return self.format_response(
