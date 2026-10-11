@@ -1,10 +1,11 @@
-# SmartEnergy AI
+## Live Demo - Electricity Demand Forecasting and Anomaly Detection for Smart Homes
 
-## Electricity Demand Forecasting and Anomaly Detection for Smart Homes
+**Try the application:** https://eledadw.streamlit.app/
 
-SmartEnergy AI is an end-to-end machine learning application designed to analyze household electricity consumption, forecast future energy demand, detect unusual consumption patterns, estimate electricity costs, and provide AI-assisted energy insights.
+Explore household electricity-demand forecasting, anomaly detection, historical consumption analytics, estimated electricity costs, and the AI energy assistant.
 
 The project combines **machine learning, time-series feature engineering, anomaly detection, FastAPI, Streamlit, and a voice-enabled AI assistant** into a single smart-energy analytics platform.
+
 
 ---
 
